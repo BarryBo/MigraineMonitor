@@ -1,0 +1,7 @@
+#!/bin/bash
+echo "Doing autorun"
+pushd /home/pi
+sudo python /home/pi/migrainemonitor.py &
+popd
+
+
