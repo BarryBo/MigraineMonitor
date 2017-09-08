@@ -66,6 +66,7 @@ def SetLED(v):
   GPIO.output(LED, v)
 
 def DrawCentered(draw, font, y, m):
+   draw.polygon([(0, y), (0,63), (127,63),(127,y)], fill=0)
    (w,h) = draw.textsize(m, font)
    x = (128-w)/2
    draw.text((x,y), m, font=font, fill=255)
@@ -81,13 +82,19 @@ fontheader = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSans.ttf
 font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSans.ttf',20)
 disp.set_contrast(0)
 
+# Typical is 101325 +/- 3386  = 104711 - 97939
+MIN_PRESSURE=97000
+
 # Light blue region is 128x48
 # Yellow region is 128x16
-def UpdateDisplay():
-   DrawCentered(draw, fontheader, 48, 'Migraine Monitor')
-   maxp = max(pressurelog)
+def UpdateDisplay(pressure):
+   msg = '{0}.{1} kPa'.format((int)(pressure/1000), (int)(pressure%1000))
+   DrawCentered(draw, fontheader, 48, msg)
+   pressurelog.append(pressure)
+   maxp = max(pressurelog) - MIN_PRESSURE
    x=0
    for p in pressurelog:
+    p = p - MIN_PRESSURE
     y = (p*48)/maxp
     draw.line([(x,0),(x,48)]) # erase the old pixel in this column
     draw.point((x,(48-y)), fill=255) # draw the new one
@@ -102,6 +109,15 @@ def UIThread(a, *args):
    time.sleep(0.2)
    SetLED(GPIO.LOW)
 
+def test():
+  p = MIN_PRESSURE
+  i =0
+  while i < 1024:
+    p = p + 20
+    UpdateDisplay(p)
+    time.sleep(0.1)
+    i = i + 1
+  
 time.sleep(5) # give the OS plenty of time to boot
 
 GPIO.setmode(GPIO.BCM)
@@ -135,7 +151,6 @@ while True:
   sealevel_pressure = sensor.read_sealevel_pressure()  
   fo.write('{0},{1:0.2f},{2:0.2f},{3:0.2f},{4:0.2f},localtime\n'.format(dt, temperature, pressure, altitude, sealevel_pressure))
   fo.flush()
-  pressurelog.append(pressure)
-  UpdateDisplay()
+  UpdateDisplay(pressure)
   time.sleep(60)
   
