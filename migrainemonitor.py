@@ -23,9 +23,10 @@
 # Can enable debug output by uncommenting:
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
-from datetime import datetime
+import datetime
 import time
 import thread
+import math
 import Adafruit_BMP.BMP085 as BMP085
 import os
 import RPi.GPIO as GPIO
@@ -82,20 +83,20 @@ fontheader = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSans.ttf
 font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSans.ttf',20)
 disp.set_contrast(0)
 
-# Typical is 101325 +/- 3386  = 104711 - 97939
-MIN_PRESSURE=97000
-
 # Light blue region is 128x48
 # Yellow region is 128x16
 def UpdateDisplay(pressure):
    msg = '{0}.{1} kPa'.format((int)(pressure/1000), (int)(pressure%1000))
    DrawCentered(draw, fontheader, 48, msg)
    pressurelog.append(pressure)
-   maxp = max(pressurelog) - MIN_PRESSURE
+   minp = math.floor(min(pressurelog))
+   rangep = math.ceil(max(pressurelog)) - minp
+   if rangep < 100:
+    rangep = 100;
    x=0
    for p in pressurelog:
-    p = p - MIN_PRESSURE
-    y = (p*48)/maxp
+    p = p - minp
+    y = (p*48)/rangep
     draw.line([(x,0),(x,48)]) # erase the old pixel in this column
     draw.point((x,(48-y)), fill=255) # draw the new one
     x = x+1   
@@ -109,15 +110,6 @@ def UIThread(a, *args):
    time.sleep(0.2)
    SetLED(GPIO.LOW)
 
-def test():
-  p = MIN_PRESSURE
-  i =0
-  while i < 1024:
-    p = p + 20
-    UpdateDisplay(p)
-    time.sleep(0.1)
-    i = i + 1
-  
 time.sleep(5) # give the OS plenty of time to boot
 
 GPIO.setmode(GPIO.BCM)
@@ -142,15 +134,16 @@ thread.start_new_thread(UIThread, ('', ''))
 # consumption are primarily the differences).  The default mode is STANDARD.
 sensor = BMP085.BMP085(mode=BMP085.BMP085_ULTRAHIGHRES)
 
-fo = open('migraine_pressure_log.txt', 'a')
 while True:
-  dt = datetime.now().isoformat()
+  dt = datetime.datetime.today().isoformat()
   temperature = sensor.read_temperature()
   pressure = sensor.read_pressure()
   altitude = sensor.read_altitude()
   sealevel_pressure = sensor.read_sealevel_pressure()  
+  fo = open('migraine_pressure_log_' + str(datetime.date.today())+'.txt', 'a')
   fo.write('{0},{1:0.2f},{2:0.2f},{3:0.2f},{4:0.2f},localtime\n'.format(dt, temperature, pressure, altitude, sealevel_pressure))
   fo.flush()
+  fo.close()
   UpdateDisplay(pressure)
   time.sleep(60)
   
