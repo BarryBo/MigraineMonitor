@@ -20,6 +20,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# requires:
+# python pillow - 'pip install pillow'
+# Adafruit_Python_BMP-master.zip - downloaded from git.  The BMP085 sensor driver is needed.
+#
+# auto-run on Pi by adding this line to /etc/profile:
+#   python <path_to>/migrainemonitor.py &
+
 # Can enable debug output by uncommenting:
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
@@ -31,12 +38,13 @@ import Adafruit_BMP.BMP085 as BMP085
 import os
 import RPi.GPIO as GPIO
 import smbus
+import sys
 
 import spidev as SPI
 import SSD1306
-import Image
-import ImageDraw
-import ImageFont
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
 import collections
 
 address = 0x20 # Buzzer and LED2 is controlled by PCF8574 at i2c 0x20
@@ -110,12 +118,19 @@ def UIThread(a, *args):
    time.sleep(0.2)
    SetLED(GPIO.LOW)
 
+log_enabled = True if len(sys.argv) > 1 else False
+if log_enabled == True:
+    print "Simple configuration: no logging"
+else:
+    print "Complex configuratio: logging is enabled"
+
 time.sleep(5) # give the OS plenty of time to boot
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(LED, GPIO.OUT)
 GPIO.setup(KEY, GPIO.IN, GPIO.PUD_UP)
-thread.start_new_thread(ButtonThread, ('', ''))
+if log_enabled == True:
+  thread.start_new_thread(ButtonThread, ('', ''))
 thread.start_new_thread(UIThread, ('', ''))
 
 # Default constructor will pick a default I2C bus.
@@ -139,11 +154,12 @@ while True:
   temperature = sensor.read_temperature()
   pressure = sensor.read_pressure()
   altitude = sensor.read_altitude()
-  sealevel_pressure = sensor.read_sealevel_pressure()  
-  fo = open('migraine_pressure_log_' + str(datetime.date.today())+'.txt', 'a')
-  fo.write('{0},{1:0.2f},{2:0.2f},{3:0.2f},{4:0.2f},localtime\n'.format(dt, temperature, pressure, altitude, sealevel_pressure))
-  fo.flush()
-  fo.close()
+  sealevel_pressure = sensor.read_sealevel_pressure()
+  if log_enabled == True:
+    fo = open('migraine_pressure_log_' + str(datetime.date.today())+'.txt', 'a')
+    fo.write('{0},{1:0.2f},{2:0.2f},{3:0.2f},{4:0.2f},localtime\n'.format(dt, temperature, pressure, altitude, sealevel_pressure))
+    fo.flush()
+    fo.close()
   UpdateDisplay(pressure)
   time.sleep(60)
   
