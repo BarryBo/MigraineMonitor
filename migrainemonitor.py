@@ -32,7 +32,7 @@
 #logging.basicConfig(level=logging.DEBUG)
 import datetime
 import time
-import thread
+import threading
 import math
 import Adafruit_BMP.BMP085 as BMP085
 import os
@@ -60,16 +60,19 @@ def beep_on():
 def beep_off():
 	bus.write_byte(address,0x80|bus.read_byte(address))
 
-def ButtonThread(a, *args):
-  fo = open('migraine_start_log.txt', 'a')
-  while True:
-    GPIO.wait_for_edge(KEY, GPIO.FALLING) # can read from 'address' to check which direction the joystick has been moved
-    beep_on()
-    dt = datetime.now().isoformat()
-    fo.write('{0},localtime\n'.format(dt))
-    fo.flush()
-    time.sleep(0.25) # debouncing delay
-    beep_off()
+class ButtonThread(threading.Thread):
+  def __init__(self):
+    threading.Thread.__init__(self)
+  def run(self):
+    fo = open('migraine_start_log.txt', 'a')
+    while True:
+      GPIO.wait_for_edge(KEY, GPIO.FALLING) # can read from 'address' to check which direction the joystick has been moved
+      beep_on()
+      dt = datetime.now().isoformat()
+      fo.write('{0},localtime\n'.format(dt))
+      fo.flush()
+      time.sleep(0.25) # debouncing delay
+      beep_off()
 
 def SetLED(v):
   GPIO.output(LED, v)
@@ -111,27 +114,32 @@ def UpdateDisplay(pressure):
    disp.image(image)
    disp.display()
    
-def UIThread(a, *args):
- while True:
-   time.sleep(4.8)
-   SetLED(GPIO.HIGH)
-   time.sleep(0.2)
-   SetLED(GPIO.LOW)
+class UIThread(threading.Thread):
+  def __init__(self):
+    threading.Thread.__init__(self)
+  def run(self):
+    while True:
+     time.sleep(4.8)
+     SetLED(GPIO.HIGH)
+     time.sleep(0.2)
+     SetLED(GPIO.LOW)
 
 log_enabled = True if len(sys.argv) > 1 else False
-if log_enabled == True:
-    print "Simple configuration: no logging"
+if not log_enabled:
+    print("Simple configuration: no logging")
 else:
-    print "Complex configuratio: logging is enabled"
+    print("Complex configuration: logging is enabled")
 
 time.sleep(5) # give the OS plenty of time to boot
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(LED, GPIO.OUT)
 GPIO.setup(KEY, GPIO.IN, GPIO.PUD_UP)
-if log_enabled == True:
-  thread.start_new_thread(ButtonThread, ('', ''))
-thread.start_new_thread(UIThread, ('', ''))
+if log_enabled:
+  buttonthread = ButtonThread()
+  buttonthread.start()
+uithread = UIThread()
+uithread.start()
 
 # Default constructor will pick a default I2C bus.
 #
